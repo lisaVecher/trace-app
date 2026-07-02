@@ -25,7 +25,13 @@ const lockButton = document.getElementById("lockButton");
 const traceModeButton = document.getElementById("traceModeButton");
 const exitTraceModeButton = document.getElementById("exitTraceModeButton");
 
+const traceInstruction = document.getElementById("traceInstruction");
+const closeInstructionButton = document.getElementById(
+  "closeInstructionButton",
+);
+
 let originalImageUrl = null;
+let currentImageDataUrl = null;
 
 let scale = 1;
 let rotation = 0;
@@ -42,6 +48,8 @@ let isLocked = false;
 let startX = 0;
 let startY = 0;
 
+let threeFingerTapTimes = [];
+
 async function startCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -53,7 +61,7 @@ async function startCamera() {
 
     camera.srcObject = stream;
   } catch (error) {
-    alert("Не вдалося отримати доступ до камери. Перевір дозвіл у браузері.");
+    alert("Не вдалося отримати доступ до камери.");
     console.error(error);
   }
 }
@@ -68,6 +76,8 @@ function updateImageTransform() {
     scale(${scale * flipX}, ${scale * flipY})
     rotate(${rotation}deg)
   `;
+
+  saveState();
 }
 
 imageInput.addEventListener("change", () => {
@@ -75,25 +85,35 @@ imageInput.addEventListener("change", () => {
 
   if (!file) return;
 
-  originalImageUrl = URL.createObjectURL(file);
+  const reader = new FileReader();
 
-  overlayImage.src = originalImageUrl;
-  overlayImage.style.display = "block";
+  reader.onload = () => {
+    originalImageUrl = reader.result;
+    currentImageDataUrl = reader.result;
 
-  posX = window.innerWidth / 2;
-  posY = window.innerHeight / 2;
+    overlayImage.src = currentImageDataUrl;
+    overlayImage.style.display = "block";
 
-  scale = 1;
-  rotation = 0;
-  opacity = 0.55;
-  flipX = 1;
-  flipY = 1;
+    posX = window.innerWidth / 2;
+    posY = window.innerHeight / 2;
 
-  scaleControl.value = scale;
-  rotateControl.value = rotation;
-  opacityControl.value = opacity;
+    scale = 1;
+    rotation = 0;
+    opacity = 0.55;
+    flipX = 1;
+    flipY = 1;
+    isLocked = false;
 
-  updateImageTransform();
+    scaleControl.value = scale;
+    rotateControl.value = rotation;
+    opacityControl.value = opacity;
+    lockButton.textContent = "Зафіксувати фото";
+
+    updateImageTransform();
+    saveState();
+  };
+
+  reader.readAsDataURL(file);
 });
 
 opacityControl.addEventListener("input", () => {
@@ -152,12 +172,17 @@ lockButton.addEventListener("click", () => {
   isLocked = !isLocked;
 
   lockButton.textContent = isLocked ? "Розблокувати фото" : "Зафіксувати фото";
+
+  saveState();
 });
 
 originalButton.addEventListener("click", () => {
   if (!originalImageUrl) return;
 
-  overlayImage.src = originalImageUrl;
+  currentImageDataUrl = originalImageUrl;
+  overlayImage.src = currentImageDataUrl;
+
+  saveState();
 });
 
 softSketchButton.addEventListener("click", () => {
@@ -206,20 +231,20 @@ function createSketch(mode) {
 
     ctx.drawImage(img, 0, 0, width, height);
 
-    let imageData = ctx.getImageData(0, 0, width, height);
-    let data = imageData.data;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
 
     if (mode === "blackWhite") {
       applyBlackWhite(data);
       ctx.putImageData(imageData, 0, 0);
-      overlayImage.src = canvas.toDataURL("image/png");
+      setCanvasAsOverlay();
       return;
     }
 
     if (mode === "highContrast") {
       applyHighContrast(data);
       ctx.putImageData(imageData, 0, 0);
-      overlayImage.src = canvas.toDataURL("image/png");
+      setCanvasAsOverlay();
       return;
     }
 
@@ -240,6 +265,12 @@ function createSketch(mode) {
   };
 
   img.src = originalImageUrl;
+}
+
+function setCanvasAsOverlay() {
+  currentImageDataUrl = canvas.toDataURL("image/png");
+  overlayImage.src = currentImageDataUrl;
+  saveState();
 }
 
 function applyBlackWhite(data) {
@@ -318,7 +349,7 @@ function createEdgeImage(ctx, width, height, threshold, lineOnly) {
   }
 
   ctx.putImageData(output, 0, 0);
-  overlayImage.src = canvas.toDataURL("image/png");
+  setCanvasAsOverlay();
 }
 
 toggleControls.addEventListener("click", () => {
@@ -335,6 +366,14 @@ hideControlsButton.addEventListener("click", () => {
 });
 
 traceModeButton.addEventListener("click", () => {
+  enterTraceMode();
+});
+
+exitTraceModeButton.addEventListener("click", () => {
+  exitTraceMode();
+});
+
+function enterTraceMode() {
   controls.classList.add("hidden");
   toggleControls.classList.add("hidden");
   exitTraceModeButton.classList.remove("hidden");
@@ -344,17 +383,104 @@ traceModeButton.addEventListener("click", () => {
   opacityControl.value = opacity;
 
   updateImageTransform();
-});
 
-exitTraceModeButton.addEventListener("click", () => {
+  if (!sessionStorage.getItem("traceInstructionClosed")) {
+    traceInstruction.classList.remove("hidden");
+  }
+}
+
+function exitTraceMode() {
   controls.classList.remove("hidden");
   toggleControls.classList.remove("hidden");
   exitTraceModeButton.classList.add("hidden");
+  traceInstruction.classList.add("hidden");
 
   isLocked = false;
   lockButton.textContent = "Зафіксувати фото";
 
   updateImageTransform();
+}
+
+closeInstructionButton.addEventListener("click", () => {
+  traceInstruction.classList.add("hidden");
+  sessionStorage.setItem("traceInstructionClosed", "true");
 });
 
+document.addEventListener("touchstart", (event) => {
+  if (event.touches.length !== 3) return;
+
+  const now = Date.now();
+
+  threeFingerTapTimes.push(now);
+
+  threeFingerTapTimes = threeFingerTapTimes.filter((time) => {
+    return now - time < 1600;
+  });
+
+  if (threeFingerTapTimes.length >= 3) {
+    threeFingerTapTimes = [];
+
+    if (!exitTraceModeButton.classList.contains("hidden")) {
+      exitTraceMode();
+    }
+  }
+});
+
+function saveState() {
+  if (!currentImageDataUrl) return;
+
+  const state = {
+    currentImageDataUrl,
+    originalImageUrl,
+    scale,
+    rotation,
+    opacity,
+    flipX,
+    flipY,
+    posX,
+    posY,
+    isLocked,
+  };
+
+  sessionStorage.setItem("traceCamState", JSON.stringify(state));
+}
+
+function loadState() {
+  const savedState = sessionStorage.getItem("traceCamState");
+
+  if (!savedState) return;
+
+  try {
+    const state = JSON.parse(savedState);
+
+    currentImageDataUrl = state.currentImageDataUrl;
+    originalImageUrl = state.originalImageUrl;
+
+    scale = state.scale ?? 1;
+    rotation = state.rotation ?? 0;
+    opacity = state.opacity ?? 0.55;
+    flipX = state.flipX ?? 1;
+    flipY = state.flipY ?? 1;
+    posX = state.posX ?? window.innerWidth / 2;
+    posY = state.posY ?? window.innerHeight / 2;
+    isLocked = state.isLocked ?? false;
+
+    overlayImage.src = currentImageDataUrl;
+    overlayImage.style.display = "block";
+
+    scaleControl.value = scale;
+    rotateControl.value = rotation;
+    opacityControl.value = opacity;
+
+    lockButton.textContent = isLocked
+      ? "Розблокувати фото"
+      : "Зафіксувати фото";
+
+    updateImageTransform();
+  } catch (error) {
+    console.error("Не вдалося відновити стан:", error);
+  }
+}
+
+loadState();
 startCamera();

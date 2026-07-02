@@ -16,7 +16,14 @@
 
         <canvas id="canvas" hidden></canvas>
 
-        <button id="toggleControls" class="toggle-controls">Меню</button>
+        <button id="toggleControls" class="toggle-controls">☰ Меню</button>
+        <button id="exitTraceModeButton" class="exit-trace hidden">Вийти з режиму</button>
+
+        <div id="traceInstruction" class="trace-instruction hidden">
+            <button id="closeInstructionButton" class="close-instruction">×</button>
+            <strong>Режим обводки</strong>
+            <p>Щоб вийти назад, натисни на екран трьома пальцями тричі.</p>
+        </div>
 
         <section id="controls" class="controls">
             <h1>TraceCam</h1>
@@ -48,14 +55,8 @@
                 <input type="range" id="rotateControl" min="-180" max="180" step="1" value="0" />
             </label>
 
-            <label>
-                Сила контуру
-                <input type="range" id="edgeControl" min="20" max="120" step="5" value="60" />
-            </label>
-
             <button id="lockButton">Зафіксувати фото</button>
             <button id="traceModeButton">Режим обводки</button>
-
             <button id="hideControlsButton">Сховати меню</button>
         </section>
     </main>
