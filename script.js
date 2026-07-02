@@ -3,6 +3,10 @@ const imageInput = document.getElementById("imageInput");
 const overlayImage = document.getElementById("overlayImage");
 const canvas = document.getElementById("canvas");
 
+const controls = document.getElementById("controls");
+const toggleControls = document.getElementById("toggleControls");
+const hideControlsButton = document.getElementById("hideControlsButton");
+
 const opacityControl = document.getElementById("opacityControl");
 const scaleControl = document.getElementById("scaleControl");
 const rotateControl = document.getElementById("rotateControl");
@@ -228,3 +232,18 @@ function createSketch() {
 }
 
 startCamera();
+
+toggleControls.addEventListener("click", () => {
+  controls.classList.toggle("hidden");
+
+  if (controls.classList.contains("hidden")) {
+    toggleControls.textContent = "☰ Меню";
+  } else {
+    toggleControls.textContent = "✕ Закрити";
+  }
+});
+
+hideControlsButton.addEventListener("click", () => {
+  controls.classList.add("hidden");
+  toggleControls.textContent = "Меню";
+});
