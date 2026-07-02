@@ -10,18 +10,29 @@ const hideControlsButton = document.getElementById("hideControlsButton");
 const opacityControl = document.getElementById("opacityControl");
 const scaleControl = document.getElementById("scaleControl");
 const rotateControl = document.getElementById("rotateControl");
-const edgeControl = document.getElementById("edgeControl");
 
-const sketchButton = document.getElementById("sketchButton");
+const softSketchButton = document.getElementById("softSketchButton");
+const strongSketchButton = document.getElementById("strongSketchButton");
+const blackWhiteButton = document.getElementById("blackWhiteButton");
+const lineOnlyButton = document.getElementById("lineOnlyButton");
+const highContrastButton = document.getElementById("highContrastButton");
 const originalButton = document.getElementById("originalButton");
+
+const flipHorizontalButton = document.getElementById("flipHorizontalButton");
+const flipVerticalButton = document.getElementById("flipVerticalButton");
+
 const lockButton = document.getElementById("lockButton");
+const traceModeButton = document.getElementById("traceModeButton");
+const exitTraceModeButton = document.getElementById("exitTraceModeButton");
 
 let originalImageUrl = null;
-let currentImage = new Image();
 
 let scale = 1;
 let rotation = 0;
 let opacity = 0.55;
+
+let flipX = 1;
+let flipY = 1;
 
 let posX = window.innerWidth / 2;
 let posY = window.innerHeight / 2;
@@ -54,7 +65,7 @@ function updateImageTransform() {
 
   overlayImage.style.transform = `
     translate(-50%, -50%)
-    scale(${scale})
+    scale(${scale * flipX}, ${scale * flipY})
     rotate(${rotation}deg)
   `;
 }
@@ -66,25 +77,23 @@ imageInput.addEventListener("change", () => {
 
   originalImageUrl = URL.createObjectURL(file);
 
-  currentImage = new Image();
-  currentImage.onload = () => {
-    overlayImage.src = originalImageUrl;
-    overlayImage.style.display = "block";
+  overlayImage.src = originalImageUrl;
+  overlayImage.style.display = "block";
 
-    posX = window.innerWidth / 2;
-    posY = window.innerHeight / 2;
-    scale = 1;
-    rotation = 0;
-    opacity = 0.55;
+  posX = window.innerWidth / 2;
+  posY = window.innerHeight / 2;
 
-    scaleControl.value = scale;
-    rotateControl.value = rotation;
-    opacityControl.value = opacity;
+  scale = 1;
+  rotation = 0;
+  opacity = 0.55;
+  flipX = 1;
+  flipY = 1;
 
-    updateImageTransform();
-  };
+  scaleControl.value = scale;
+  rotateControl.value = rotation;
+  opacityControl.value = opacity;
 
-  currentImage.src = originalImageUrl;
+  updateImageTransform();
 });
 
 opacityControl.addEventListener("input", () => {
@@ -99,6 +108,16 @@ scaleControl.addEventListener("input", () => {
 
 rotateControl.addEventListener("input", () => {
   rotation = Number(rotateControl.value);
+  updateImageTransform();
+});
+
+flipHorizontalButton.addEventListener("click", () => {
+  flipX *= -1;
+  updateImageTransform();
+});
+
+flipVerticalButton.addEventListener("click", () => {
+  flipY *= -1;
   updateImageTransform();
 });
 
@@ -141,16 +160,32 @@ originalButton.addEventListener("click", () => {
   overlayImage.src = originalImageUrl;
 });
 
-sketchButton.addEventListener("click", () => {
+softSketchButton.addEventListener("click", () => {
+  createSketch("soft");
+});
+
+strongSketchButton.addEventListener("click", () => {
+  createSketch("strong");
+});
+
+blackWhiteButton.addEventListener("click", () => {
+  createSketch("blackWhite");
+});
+
+lineOnlyButton.addEventListener("click", () => {
+  createSketch("lineOnly");
+});
+
+highContrastButton.addEventListener("click", () => {
+  createSketch("highContrast");
+});
+
+function createSketch(mode) {
   if (!originalImageUrl) {
     alert("Спочатку обери фото.");
     return;
   }
 
-  createSketch();
-});
-
-function createSketch() {
   const img = new Image();
 
   img.onload = () => {
@@ -171,79 +206,155 @@ function createSketch() {
 
     ctx.drawImage(img, 0, 0, width, height);
 
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
+    let imageData = ctx.getImageData(0, 0, width, height);
+    let data = imageData.data;
 
-    const gray = [];
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      const value = 0.299 * r + 0.587 * g + 0.114 * b;
-      gray.push(value);
+    if (mode === "blackWhite") {
+      applyBlackWhite(data);
+      ctx.putImageData(imageData, 0, 0);
+      overlayImage.src = canvas.toDataURL("image/png");
+      return;
     }
 
-    const threshold = Number(edgeControl.value);
-    const output = ctx.createImageData(width, height);
-    const outputData = output.data;
-
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const index = y * width + x;
-
-        const gx =
-          -gray[index - width - 1] +
-          gray[index - width + 1] -
-          2 * gray[index - 1] +
-          2 * gray[index + 1] -
-          gray[index + width - 1] +
-          gray[index + width + 1];
-
-        const gy =
-          -gray[index - width - 1] -
-          2 * gray[index - width] -
-          gray[index - width + 1] +
-          gray[index + width - 1] +
-          2 * gray[index + width] +
-          gray[index + width + 1];
-
-        const magnitude = Math.sqrt(gx * gx + gy * gy);
-
-        const color = magnitude > threshold ? 0 : 255;
-
-        const pixelIndex = index * 4;
-
-        outputData[pixelIndex] = color;
-        outputData[pixelIndex + 1] = color;
-        outputData[pixelIndex + 2] = color;
-        outputData[pixelIndex + 3] = 255;
-      }
+    if (mode === "highContrast") {
+      applyHighContrast(data);
+      ctx.putImageData(imageData, 0, 0);
+      overlayImage.src = canvas.toDataURL("image/png");
+      return;
     }
 
-    ctx.putImageData(output, 0, 0);
+    if (mode === "soft") {
+      createEdgeImage(ctx, width, height, 90, false);
+      return;
+    }
 
-    const sketchUrl = canvas.toDataURL("image/png");
-    overlayImage.src = sketchUrl;
+    if (mode === "strong") {
+      createEdgeImage(ctx, width, height, 45, false);
+      return;
+    }
+
+    if (mode === "lineOnly") {
+      createEdgeImage(ctx, width, height, 55, true);
+      return;
+    }
   };
 
   img.src = originalImageUrl;
 }
 
-startCamera();
+function applyBlackWhite(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+    data[i] = gray;
+    data[i + 1] = gray;
+    data[i + 2] = gray;
+  }
+}
+
+function applyHighContrast(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    let gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+    gray = gray > 135 ? 255 : 0;
+
+    data[i] = gray;
+    data[i + 1] = gray;
+    data[i + 2] = gray;
+  }
+}
+
+function createEdgeImage(ctx, width, height, threshold, lineOnly) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  const gray = [];
+
+  for (let i = 0; i < data.length; i += 4) {
+    const value = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    gray.push(value);
+  }
+
+  const output = ctx.createImageData(width, height);
+  const outputData = output.data;
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const index = y * width + x;
+
+      const gx =
+        -gray[index - width - 1] +
+        gray[index - width + 1] -
+        2 * gray[index - 1] +
+        2 * gray[index + 1] -
+        gray[index + width - 1] +
+        gray[index + width + 1];
+
+      const gy =
+        -gray[index - width - 1] -
+        2 * gray[index - width] -
+        gray[index - width + 1] +
+        gray[index + width - 1] +
+        2 * gray[index + width] +
+        gray[index + width + 1];
+
+      const magnitude = Math.sqrt(gx * gx + gy * gy);
+
+      let color;
+
+      if (lineOnly) {
+        color = magnitude > threshold ? 0 : 255;
+      } else {
+        color = magnitude > threshold ? 25 : 255;
+      }
+
+      const pixelIndex = index * 4;
+
+      outputData[pixelIndex] = color;
+      outputData[pixelIndex + 1] = color;
+      outputData[pixelIndex + 2] = color;
+      outputData[pixelIndex + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(output, 0, 0);
+  overlayImage.src = canvas.toDataURL("image/png");
+}
 
 toggleControls.addEventListener("click", () => {
   controls.classList.toggle("hidden");
 
-  if (controls.classList.contains("hidden")) {
-    toggleControls.textContent = "☰ Меню";
-  } else {
-    toggleControls.textContent = "✕ Закрити";
-  }
+  toggleControls.textContent = controls.classList.contains("hidden")
+    ? "☰ Меню"
+    : "✕ Закрити";
 });
 
 hideControlsButton.addEventListener("click", () => {
   controls.classList.add("hidden");
-  toggleControls.textContent = "Меню";
+  toggleControls.textContent = "☰ Меню";
 });
+
+traceModeButton.addEventListener("click", () => {
+  controls.classList.add("hidden");
+  toggleControls.classList.add("hidden");
+  exitTraceModeButton.classList.remove("hidden");
+
+  isLocked = true;
+  opacity = 0.45;
+  opacityControl.value = opacity;
+
+  updateImageTransform();
+});
+
+exitTraceModeButton.addEventListener("click", () => {
+  controls.classList.remove("hidden");
+  toggleControls.classList.remove("hidden");
+  exitTraceModeButton.classList.add("hidden");
+
+  isLocked = false;
+  lockButton.textContent = "Зафіксувати фото";
+
+  updateImageTransform();
+});
+
+startCamera();
