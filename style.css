@@ -10,12 +10,13 @@ body {
     overflow: hidden;
     font-family: Arial, sans-serif;
     background: #111;
+    overscroll-behavior: none;
 }
 
 .app {
     position: relative;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
 }
 
@@ -44,23 +45,30 @@ body {
 }
 
 .controls {
-    position: absolute;
+    position: fixed;
     left: 10px;
     right: 10px;
-    bottom: 10px;
-    z-index: 10;
-    padding: 12px;
-    border-radius: 16px;
-    background: rgba(0, 0, 0, 0.72);
+    bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 50;
+
+    height: 52dvh;
+    max-height: 52dvh;
+    padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px));
+
+    border-radius: 18px 18px 0 0;
+    background: rgba(0, 0, 0, 0.82);
     color: white;
+
     display: flex;
     flex-direction: column;
-    gap: 9px;
-    backdrop-filter: blur(8px);
+    gap: 10px;
 
-    max-height: 58vh;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+
+    touch-action: pan-y;
+    backdrop-filter: blur(8px);
 }
 
 .controls h1 {
@@ -100,19 +108,21 @@ button:active {
 
 .toggle-controls {
     position: fixed;
-    bottom: 20px;
     left: 15px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     z-index: 100;
+
     padding: 12px 16px;
     border-radius: 999px;
     border: none;
+
     background: white;
     color: black;
     font-weight: bold;
 }
 
 .controls.hidden {
-    transform: translateY(120%);
+    transform: translateY(calc(100% + 30px));
     opacity: 0;
     pointer-events: none;
 }
@@ -124,4 +134,17 @@ button:active {
 .controls::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.45);
     border-radius: 999px;
+}
+
+.controls input,
+.controls button,
+.controls label {
+    flex-shrink: 0;
+}
+
+.controls::after {
+    content: "";
+    display: block;
+    min-height: 40px;
+    flex-shrink: 0;
 }
